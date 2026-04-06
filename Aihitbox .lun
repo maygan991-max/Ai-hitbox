@@ -1,0 +1,158 @@
+local Players = cloneref(game:GetService('Players'))
+local RS = cloneref(game:GetService('RunService'))
+local UIS = game:GetService("UserInputService")
+local Client = Players.LocalPlayer
+
+local size = 8
+local UIEnabled = true
+
+-- UI
+local ScreenGui = Instance.new('ScreenGui')
+ScreenGui.Name = 'HitboxExpanderUI'
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = Client:WaitForChild('PlayerGui')
+
+local MainFrame = Instance.new('Frame')
+MainFrame.Size = UDim2.new(0, 250, 0, 120)
+MainFrame.Position = UDim2.new(0.5, -125, 0.05, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+Instance.new('UICorner', MainFrame).CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new('TextLabel')
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = 'Hitbox Expander'
+Title.TextColor3 = Color3.fromRGB(255,255,255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.Parent = MainFrame
+
+local SizeLabel = Instance.new('TextLabel')
+SizeLabel.Size = UDim2.new(1, -20, 0, 20)
+SizeLabel.Position = UDim2.new(0, 10, 0, 40)
+SizeLabel.BackgroundTransparency = 1
+SizeLabel.Text = 'Size: ' .. size
+SizeLabel.TextColor3 = Color3.fromRGB(255,255,255)
+SizeLabel.Font = Enum.Font.Gotham
+SizeLabel.TextSize = 14
+SizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+SizeLabel.Parent = MainFrame
+
+local SliderFrame = Instance.new('Frame')
+SliderFrame.Size = UDim2.new(1, -20, 0, 30)
+SliderFrame.Position = UDim2.new(0, 10, 0, 70)
+SliderFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
+SliderFrame.BorderSizePixel = 0
+SliderFrame.Parent = MainFrame
+
+Instance.new('UICorner', SliderFrame).CornerRadius = UDim.new(0,6)
+
+local SliderButton = Instance.new('TextButton')
+SliderButton.Size = UDim2.new(0, 40, 1, 0)
+SliderButton.Position = UDim2.new((size - 5)/95, -20, 0, 0)
+SliderButton.BackgroundColor3 = Color3.fromRGB(255,0,0)
+SliderButton.Text = ''
+SliderButton.Parent = SliderFrame
+
+Instance.new('UICorner', SliderButton).CornerRadius = UDim.new(0,6)
+
+-- Slider
+local dragging = false
+
+SliderButton.MouseButton1Down:Connect(function()
+    dragging = true
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+RS.RenderStepped:Connect(function()
+    if dragging then
+        local mouse = Client:GetMouse()
+        local relativeX = math.clamp(
+            mouse.X - SliderFrame.AbsolutePosition.X,
+            0,
+            SliderFrame.AbsoluteSize.X
+        )
+        local percentage = relativeX / SliderFrame.AbsoluteSize.X
+        size = math.floor(5 + (percentage * 95))
+        SliderButton.Position = UDim2.new(percentage, -20, 0, 0)
+        SizeLabel.Text = 'Size: ' .. size
+    end
+end)
+
+-- เปิด/ปิด UI
+UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        UIEnabled = not UIEnabled
+        ScreenGui.Enabled = UIEnabled
+    end
+end)
+
+-- ลาก UI
+local draggingUI = false
+local dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingUI = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                draggingUI = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input == dragInput and draggingUI then
+        update(input)
+    end
+end)
+
+-- Hitbox
+RS.RenderStepped:Connect(function()
+    if not UIEnabled then return end
+
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player == Client then continue end
+
+        if Player.Character and Player.Character:FindFirstChild('HumanoidRootPart') then
+            local HRP = Player.Character.HumanoidRootPart
+            local Humanoid = Player.Character:FindFirstChild('Humanoid')
+
+            if Humanoid and Humanoid.Health > 0 then
+                HRP.Size = Vector3.new(size, size, size)
+                HRP.Transparency = 0.5
+                HRP.CanCollide = false
+                HRP.Color = Color3.fromRGB(255,255,255)
+            end
+        end
+    end
+end)
